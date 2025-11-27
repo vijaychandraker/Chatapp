@@ -33,6 +33,9 @@ namespace chat2
                     LoadMessages(chatRoomId);
                     LoadDocuments(chatRoomId);
 
+                    // Load chat rooms list for sidebar (primarily for admins)
+                    LoadSidebarChatRooms();
+
                     // Set back button link
                     string userRole = Session["UserRole"].ToString();
                     if (userRole == "Admin")
@@ -80,8 +83,66 @@ namespace chat2
         private void LoadDocuments(int chatRoomId)
         {
             DataTable dt = DocumentDAL.GetDocuments(chatRoomId);
-            rptDocuments.DataSource = dt;
+
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                rptDocuments.DataSource = dt;
+                rptDocuments.DataBind();
+                return;
+            }
+
+            // Sort by UploadDate descending so newest groups appear first
+            dt.DefaultView.Sort = "UploadDate DESC";
+            DataTable sorted = dt.DefaultView.ToTable();
+
+            // Clone structure and add a HeaderText column used for date grouping in the repeater
+            DataTable grouped = sorted.Clone();
+            if (!grouped.Columns.Contains("HeaderText"))
+            {
+                grouped.Columns.Add("HeaderText", typeof(string));
+            }
+
+            DateTime? currentDate = null;
+            foreach (DataRow row in sorted.Rows)
+            {
+                DateTime uploadDate = Convert.ToDateTime(row["UploadDate"]).Date;
+                DataRow newRow = grouped.NewRow();
+
+                foreach (DataColumn col in sorted.Columns)
+                {
+                    newRow[col.ColumnName] = row[col.ColumnName];
+                }
+
+                string header = string.Empty;
+                if (!currentDate.HasValue || uploadDate != currentDate.Value)
+                {
+                    if (uploadDate == DateTime.Today)
+                        header = "Today";
+                    else if (uploadDate == DateTime.Today.AddDays(-1))
+                        header = "Yesterday";
+                    else
+                        header = uploadDate.ToString("dd MMM yyyy");
+
+                    currentDate = uploadDate;
+                }
+
+                newRow["HeaderText"] = header;
+                grouped.Rows.Add(newRow);
+            }
+
+            rptDocuments.DataSource = grouped;
             rptDocuments.DataBind();
+        }
+
+        private void LoadSidebarChatRooms()
+        {
+            DataTable dt = ChatRoomDAL.GetAdminChatRooms();
+
+            if (dt != null && dt.Rows.Count > 0)
+            {
+                rptSidebarChatRooms.DataSource = dt;
+                rptSidebarChatRooms.DataBind();
+            }
         }
 
         protected void btnSend_Click(object sender, EventArgs e)
@@ -152,8 +213,6 @@ namespace chat2
                     // Reload UI
                     LoadDocuments(chatRoomId);
                     LoadMessages(chatRoomId);
-
-                    ScriptManager.RegisterStartupScript(this, GetType(), "alert", "alert('Document uploaded and sent successfully!');", true);
                 }
             }
             catch (Exception ex)
@@ -297,39 +356,67 @@ namespace chat2
 
             string sizeText = fileSize >= 0 ? FormatBytes(fileSize) : "";
 
-            // Build WhatsApp-like card with iconSvg or thumbnail
+            // Build WhatsApp-like card with top preview and bottom info row
             string iconSvg = GetIconSvg(ext);
+            string fileTypeLabel = string.IsNullOrEmpty(ext) ? "FILE" : ext.TrimStart('.').ToUpperInvariant();
+            string infoText = string.IsNullOrEmpty(sizeText)
+                ? HttpUtility.HtmlEncode(fileTypeLabel)
+                : HttpUtility.HtmlEncode(fileTypeLabel) + " • " + sizeText;
+
             string cardHtml;
             if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".webp")
             {
+                // Image: show image as top preview
                 cardHtml = $@"
 <div class='attachment-card'>
   <a class='attachment-link' href='{resolvedUrl}' target='_blank'>
-    <img class='attachment-thumb' src='{resolvedUrl}' alt='{HttpUtility.HtmlAttributeEncode(filename)}' />
-    <div class='attachment-meta'>
-      <div class='attachment-name'>{HttpUtility.HtmlEncode(filename)}</div>
-      <div class='attachment-info'>{sizeText} • Image</div>
+    <div class='attachment-preview'>
+      <img class='attachment-preview-img' src='{resolvedUrl}' alt='{HttpUtility.HtmlAttributeEncode(filename)}' />
+    </div>
+    <div class='attachment-bottom'>
+      <div class='attachment-bottom-main'>
+        <div class='attachment-doc-icon'>
+          <i class='fas fa-image'></i>
+        </div>
+        <div class='attachment-meta'>
+          <div class='attachment-name'>{HttpUtility.HtmlEncode(filename)}</div>
+          <div class='attachment-info'>{HttpUtility.HtmlEncode(sizeText)}</div>
+        </div>
+      </div>
+      <div class='attachment-actions'>
+        <i class='fas fa-download attachment-download-icon'></i>
+      </div>
     </div>
   </a>
 </div>";
             }
             else
             {
-                // use inline SVG icon
+                // Non-image: show type pill at top and details below
                 cardHtml = $@"
 <div class='attachment-card'>
   <a class='attachment-link' href='{resolvedUrl}' target='_blank'>
-    <div class='attachment-icon'>{iconSvg}</div>
-    <div class='attachment-meta'>
-      <div class='attachment-name'>{HttpUtility.HtmlEncode(filename)}</div>
-      <div class='attachment-info'>{sizeText} • {HttpUtility.HtmlEncode(ext.TrimStart('.').ToUpperInvariant())}</div>
+    <div class='attachment-preview'>
+      <div class='attachment-type-pill'>{HttpUtility.HtmlEncode(fileTypeLabel)}</div>
+    </div>
+    <div class='attachment-bottom'>
+      <div class='attachment-bottom-main'>
+        <div class='attachment-doc-icon attachment-doc-icon-badge'>{HttpUtility.HtmlEncode(fileTypeLabel)}</div>
+        <div class='attachment-meta'>
+          <div class='attachment-name'>{HttpUtility.HtmlEncode(filename)}</div>
+          <div class='attachment-info'>{infoText}</div>
+        </div>
+      </div>
+      <div class='attachment-actions'>
+        <i class='fas fa-download attachment-download-icon'></i>
+      </div>
     </div>
   </a>
 </div>";
             }
 
-            // Render original message link + card (original anchor will still be clickable if present)
-            lit.Text = $"<div>{messageText}</div>{cardHtml}";
+            // Render only the card (replace the raw link text with the styled preview)
+            lit.Text = cardHtml;
         }
 
         protected void Timer1_Tick(object sender, EventArgs e)
