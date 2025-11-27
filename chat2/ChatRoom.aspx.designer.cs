@@ -159,6 +159,42 @@ namespace chat2
         protected global::System.Web.UI.WebControls.HiddenField hfIsScrollAtBottom;
 
         /// <summary>
+        /// hfTagUrl control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hfTagUrl;
+
+        /// <summary>
+        /// hfTagFileName control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hfTagFileName;
+
+        /// <summary>
+        /// hfTagComment control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.HiddenField hfTagComment;
+
+        /// <summary>
+        /// btnTagDocument control.
+        /// </summary>
+        /// <remarks>
+        /// Auto-generated field.
+        /// To modify move field declaration from designer file to code-behind file.
+        /// </remarks>
+        protected global::System.Web.UI.WebControls.Button btnTagDocument;
+
+        /// <summary>
         /// Timer1 control.
         /// </summary>
         /// <remarks>

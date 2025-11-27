@@ -141,7 +141,8 @@ namespace chat2
         public static DataTable GetUserChatRooms(int userId)
         {
             string query = @"SELECT cr.ChatRoomId, cr.RoomName, cr.CreatedDate, 
-                            u.FullName as UserName, a.FullName as AdminName
+                            u.FullName as UserName, a.FullName as AdminName,
+                            (SELECT COUNT(*) FROM Messages WHERE ChatRoomId = cr.ChatRoomId AND IsRead = 0) as UnreadCount
                             FROM ChatRooms cr
                             INNER JOIN Users u ON cr.UserId = u.UserId
                             INNER JOIN Users a ON cr.AdminId = a.UserId

@@ -136,7 +136,21 @@ namespace chat2
 
         private void LoadSidebarChatRooms()
         {
-            DataTable dt = ChatRoomDAL.GetAdminChatRooms();
+            DataTable dt = null;
+
+            string userRole = Session["UserRole"] != null ? Session["UserRole"].ToString() : string.Empty;
+
+            if (string.Equals(userRole, "Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                // Admin can see all chat rooms
+                dt = ChatRoomDAL.GetAdminChatRooms();
+            }
+            else
+            {
+                // Normal user: only see own chat rooms
+                int userId = Convert.ToInt32(Session["UserId"]);
+                dt = ChatRoomDAL.GetUserChatRooms(userId);
+            }
 
             if (dt != null && dt.Rows.Count > 0)
             {
@@ -206,9 +220,28 @@ namespace chat2
                     // If you prefer to use DownloadDocument.aspx?id=..., adapt DocumentDAL.UploadDocument to return the inserted ID.
                     string fileUrl = ResolveUrl("~/Uploads/" + uniqueFileName);
 
-                    // Send a chat message containing a link to the file. MessageText is stored as HTML and rendered in the repeater.
+                    // Build a WhatsApp-like message: optional caption text (plain) + document link card
                     string messageLink = $"<a href='{fileUrl}' target='_blank'>{HttpUtility.HtmlEncode(fileName)}</a>";
-                    MessageDAL.SendMessage(chatRoomId, userId, messageLink);
+
+                    string captionRaw = txtMessage.Text ?? string.Empty;
+                    string caption = captionRaw.Trim();
+
+                    string fullMessage;
+                    if (!string.IsNullOrEmpty(caption))
+                    {
+                        // Store caption as plain text followed by a newline, then the anchor link
+                        // Rendering logic will encode the caption safely and place it above the card
+                        fullMessage = caption + "\n" + messageLink;
+                    }
+                    else
+                    {
+                        fullMessage = messageLink;
+                    }
+
+                    MessageDAL.SendMessage(chatRoomId, userId, fullMessage);
+
+                    // Clear caption textbox after sending with document
+                    txtMessage.Text = string.Empty;
 
                     // Reload UI
                     LoadDocuments(chatRoomId);
@@ -363,6 +396,19 @@ namespace chat2
                 ? HttpUtility.HtmlEncode(fileTypeLabel)
                 : HttpUtility.HtmlEncode(fileTypeLabel) + " • " + sizeText;
 
+            // Optional caption: any text before the first anchor is treated as caption
+            string captionHtml = string.Empty;
+            if (match.Success && match.Index > 0)
+            {
+                string captionPart = messageText.Substring(0, match.Index).Trim();
+                if (!string.IsNullOrWhiteSpace(captionPart))
+                {
+                    captionHtml = "<div style='margin-top:4px;'>" +
+                                  HttpUtility.HtmlEncode(captionPart).Replace("\n", "<br/>") +
+                                  "</div>";
+                }
+            }
+
             string cardHtml;
             if (ext == ".png" || ext == ".jpg" || ext == ".jpeg" || ext == ".gif" || ext == ".bmp" || ext == ".webp")
             {
@@ -415,8 +461,8 @@ namespace chat2
 </div>";
             }
 
-            // Render only the card (replace the raw link text with the styled preview)
-            lit.Text = cardHtml;
+            // Render card first, then caption (if any) below it
+            lit.Text = cardHtml + captionHtml;
         }
 
         protected void Timer1_Tick(object sender, EventArgs e)
@@ -436,6 +482,59 @@ namespace chat2
             {
                 int chatRoomId = Convert.ToInt32(hfChatRoomId.Value);
                 LoadMessages(chatRoomId);
+            }
+        }
+
+        protected void btnTagDocument_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                int chatRoomId = Convert.ToInt32(hfChatRoomId.Value);
+                int userId = Convert.ToInt32(Session["UserId"]);
+
+                string fileUrl = hfTagUrl.Value ?? string.Empty;
+                string fileName = hfTagFileName.Value ?? string.Empty;
+                string captionRaw = hfTagComment.Value ?? string.Empty;
+                string caption = captionRaw.Trim();
+
+                if (string.IsNullOrWhiteSpace(fileUrl))
+                    return;
+
+                // Ensure application-relative URLs are resolved consistently
+                if (fileUrl.StartsWith("~/") || fileUrl.StartsWith("/"))
+                {
+                    fileUrl = ResolveUrl(fileUrl);
+                }
+
+                string safeFileName = string.IsNullOrWhiteSpace(fileName)
+                    ? Path.GetFileName(fileUrl)
+                    : fileName;
+
+                string messageLink = $"<a href='{fileUrl}' target='_blank'>{HttpUtility.HtmlEncode(safeFileName)}</a>";
+
+                string fullMessage;
+                if (!string.IsNullOrEmpty(caption))
+                {
+                    // Store caption as plain text followed by a newline, then the anchor link
+                    fullMessage = caption + "\n" + messageLink;
+                }
+                else
+                {
+                    fullMessage = messageLink;
+                }
+
+                MessageDAL.SendMessage(chatRoomId, userId, fullMessage);
+
+                // Clear helper fields
+                hfTagUrl.Value = string.Empty;
+                hfTagFileName.Value = string.Empty;
+                hfTagComment.Value = string.Empty;
+
+                LoadMessages(chatRoomId);
+            }
+            catch (Exception)
+            {
+                // Swallow tagging errors to avoid breaking chat; optional: log if logging is available
             }
         }
 

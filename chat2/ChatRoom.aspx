@@ -604,7 +604,68 @@
             letter-spacing: 0.02em;
             white-space: nowrap;
         }
-    </style>
+
+        /* Responsive layout tweaks */
+        @media (max-width: 1024px) {
+            .chat-messages {
+                padding: 16px 16px 12px 16px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            body {
+                height: auto;
+                overflow: hidden;
+            }
+
+            .chat-container {
+                flex-direction: row;
+                height: 100vh;
+                min-height: 100vh;
+                overflow-y: hidden;
+            }
+
+            .sidebar,
+            .documents-panel {
+                display: none;
+            }
+
+            .main-chat {
+                flex: 1;
+                width: 100%;
+            }
+
+            .chat-header {
+                padding: 10px 12px;
+            }
+
+            .chat-messages {
+                padding: 12px 12px 10px 12px;
+            }
+
+            .chat-input-area {
+                padding: 8px 10px;
+            }
+
+            .sidebar-header {
+                padding: 14px 12px;
+            }
+
+            .document-item {
+                padding: 8px 12px;
+            }
+
+            .txt-message {
+                font-size: 13px;
+            }
+
+            .btn-send,
+            .btn-attach {
+                min-width: 36px;
+                height: 36px;
+            }
+        }
+</style>
 </head>
 <body>
     <form id="form1" runat="server">
@@ -711,7 +772,7 @@
                                 <div class="document-meta">
                                     <div class="document-name"><%# Eval("FileName") %></div>
                                     <div class="document-info">
-                                        By <%# Eval("UploaderName") %> • <%# Convert.ToDateTime(Eval("UploadDate")).ToString("MMM dd") %>
+                                        By <%# Eval("UploaderName") %> • <%# Convert.ToDateTime(Eval("UploadDate")).ToString("MMM dd, hh:mm tt") %>
                                     </div>
                                 </div>
                             </div>
@@ -723,6 +784,13 @@
         
         <asp:HiddenField ID="hfChatRoomId" runat="server" />
         <asp:HiddenField ID="hfIsScrollAtBottom" runat="server" Value="true" />
+
+        <!-- Hidden fields + button to support adding comments to already-sent documents from chat bubble -->
+        <asp:HiddenField ID="hfTagUrl" runat="server" />
+        <asp:HiddenField ID="hfTagFileName" runat="server" />
+        <asp:HiddenField ID="hfTagComment" runat="server" />
+        <asp:Button ID="btnTagDocument" runat="server" Style="display:none;" OnClick="btnTagDocument_Click" />
+
         <asp:Timer ID="Timer1" runat="server" Interval="1000" OnTick="Timer1_Tick"></asp:Timer>
     </form>
 
@@ -807,6 +875,31 @@
                 }
             });
         }
+
+        // Called from each attachment-card's onclick to link the next Send to that file
+        function onAttachmentClicked(card) {
+            if (!card) return;
+
+            var link = card.querySelector('.attachment-link');
+            if (!link) return;
+
+            var href = link.getAttribute('href') || '';
+            var nameEl = card.querySelector('.attachment-name');
+            var fileName = nameEl ? nameEl.textContent : '';
+
+            var hfUrl = document.getElementById('<%= hfTagUrl.ClientID %>');
+            var hfName = document.getElementById('<%= hfTagFileName.ClientID %>');
+            if (!hfUrl || !hfName) return;
+
+            hfUrl.value = href;
+            hfName.value = fileName;
+
+            var txt = document.getElementById('<%= txtMessage.ClientID %>');
+            if (txt) {
+                txt.focus();
+            }
+        }
     </script>
+
 </body>
 </html>
