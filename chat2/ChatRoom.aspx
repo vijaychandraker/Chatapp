@@ -589,6 +589,21 @@
         .attachment-download-icon {
             font-size: 16px;
         }
+
+        .unread-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 7px;
+            margin-left: 6px;
+            border-radius: 999px;
+            background: #00a884;
+            color: #111b21;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -612,6 +627,9 @@
                                     <div class="document-name"><%# Eval("RoomName") %></div>
                                     <div class="document-info">
                                         User: <%# Eval("UserName") %> | Admin: <%# Eval("AdminName") %>
+                                        <%# Convert.ToInt32(Eval("UnreadCount")) > 0 
+                                            ? "<span class='unread-badge'>" + Eval("UnreadCount") + "</span>" 
+                                            : string.Empty %>
                                     </div>
                                 </div>
                             </div>
